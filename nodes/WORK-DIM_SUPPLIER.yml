@@ -4,7 +4,43 @@ name: DIM_SUPPLIER
 operation:
   config:
     postSQL: ""
-    preSQL: ""
+    preSQL: |
+      {{ stage('Override Create SQL') }} 
+      CREATE OR REPLACE VIEW {{ ref('<ADD_TARGET_LOCATION>', 'V_SUPPLIER') }} AS ( 
+          WITH  
+          FilteredSuppliers AS ( 
+              SELECT  
+                  *  
+              FROM {{ ref('<ADD_SOURCE_LOCATION>', 'DIM_SUPPLIER') }} 
+              WHERE "S_ACCTBAL" > 0 -- Filter suppliers with positive account balance 
+          ), 
+          EnhancedSuppliers AS ( 
+              SELECT  
+                  "DIM_SUPPLIER_KEY", 
+                  "S_SUPPKEY", 
+                  "S_NAME", 
+                  "S_ADDRESS", 
+                  "S_NATIONKEY", 
+                  "S_PHONE", 
+                  "S_ACCTBAL", 
+                  "S_COMMENT", 
+                  "SYSTEM_VERSION", 
+                  "SYSTEM_CURRENT_FLAG", 
+                  "SYSTEM_START_DATE", 
+                  "SYSTEM_END_DATE", 
+                  "SYSTEM_CREATE_DATE", 
+                  "SYSTEM_UPDATE_DATE", 
+                  CASE  
+                      WHEN "S_ACCTBAL" > 10000 THEN 'HIGH_BALANCE'
+                      WHEN "S_ACCTBAL" BETWEEN 5000 AND 10000 THEN 'MEDIUM_BALANCE' 
+                      ELSE 'LOW_BALANCE' 
+                  END AS "BALANCE_CATEGORY" -- Classify suppliers by account balance 
+              FROM FilteredSuppliers 
+          ) 
+          SELECT  
+              * 
+          FROM EnhancedSuppliers 
+      );  
     testsEnabled: true
   database: ""
   deployEnabled: true
